@@ -4,10 +4,16 @@ from tuning_tools import (
     analyze_tuning,
     transpose_tuning,
 )
+from llm_client import ask_model, ModelError
 
 
 def new_state():
-    return {"tuning": None, "intent": None, "pending": None}
+    return {
+        "tuning": None,
+        "intent": None,
+        "pending": None,
+        "style": None,
+    }
 
 
 def tuning_question():
@@ -22,6 +28,13 @@ def continue_intent(state):
         state["pending"] = None
         return analyze_tuning(state["tuning"])
 
+    if state["intent"] == "ideas":
+        state["pending"] = "style"
+        return (
+            "What sound or style do you want? "
+            "For example: dark, dissonant metal."
+        )
+
     state["pending"] = "shift"
     return (
         "How many semitones should I move every string? "
@@ -30,15 +43,15 @@ def continue_intent(state):
     )
 
 
-def respond(message, state):
+def respond(message, state, api_key=""):
     text = message.strip()
     command = text.lower()
 
     if command == "reset":
         state.update(new_state())
-        return "Tuning cleared. Type analyze or transpose."
+        return "Tuning cleared. Type analyze, transpose, or ideas."
 
-    if command in ("analyze", "transpose"):
+    if command in ("analyze", "transpose", "ideas"):
         state["intent"] = command
         if state["tuning"] is None:
             state["pending"] = "tuning"
@@ -52,14 +65,39 @@ def respond(message, state):
             return str(error)
         return continue_intent(state)
 
+    if state["pending"] == "style":
+        if not text:
+            return "Please describe the sound or style you want."
+
+        if command != "retry" or not state.get("style"):
+            state["style"] = text
+
+        prompt = (
+            "Suggest three simple playing ideas for this exact tuning. "
+            "Include an open-string combination, a simple fretted shape "
+            "with string numbers and frets, and a rhythmic idea. "
+            "String 1 means the lowest string. "
+            "Keep the response under 250 words. "
+            "Use these Python-calculated adjacent-string intervals.\n\n"
+            f"Tuning: {format_tuning(state['tuning'])}\n"
+            f"Intervals:\n{analyze_tuning(state['tuning'])}\n"
+            f"Desired sound: {state['style']}"
+        )
+        try:
+            answer = ask_model(prompt, api_key)
+        except ModelError as error:
+            return f"{error}\n\nType retry to repeat this request."
+
+        state["pending"] = None
+        return answer
+
     if state["pending"] == "shift":
         try:
             shift = int(text)
         except ValueError:
             return "Please enter a whole number, such as -2 or 1."
 
-        # A conservative boundary avoids recommending large upward changes.
-        # This limit is a project policy, not a guarantee of string safety.
+        # This conservative project limit is not a safety guarantee.
         if shift > 2 or shift < -12:
             return (
                 "I cannot recommend that large a tuning change. "
@@ -80,4 +118,4 @@ def respond(message, state):
             "Check string tension and instrument setup before retuning."
         )
 
-    return "Type analyze, transpose, or reset."
+    return "Type analyze, transpose, ideas, or reset."
