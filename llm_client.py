@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import groq
 
 
@@ -11,6 +13,10 @@ def ask_model(prompt, api_key):
             "The AI key is missing. The app owner must configure "
             "GROQ_API_KEY in Streamlit Secrets."
         )
+
+    reference = Path(__file__).with_name(
+        "tuning_reference.md"
+    ).read_text(encoding="utf-8")
 
     try:
         # A timeout keeps a stalled API request from hanging the chat.
@@ -33,6 +39,7 @@ def ask_model(prompt, api_key):
                         "Never guarantee that a tuning is physically safe. "
                         "Refer string tension, instrument modifications, "
                         "and setup decisions to a guitar technician."
+                        f"\n\nProject reference:\n{reference}"
                     ),
                 },
                 {"role": "user", "content": prompt},
