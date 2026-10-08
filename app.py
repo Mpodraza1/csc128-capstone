@@ -1,3 +1,5 @@
+import logging
+
 import streamlit as st
 
 from conversation import new_state, respond
@@ -7,9 +9,7 @@ st.caption(
     "This is an AI software assistant for exploring guitar tunings."
 )
 st.write(
-    "Type **analyze** to examine intervals, "
-    "**transpose** to shift a tuning, "
-    "or **reset** to start again."
+    "Commands: **analyze**, **transpose**, **ideas**, **reset**."
 )
 
 if "messages" not in st.session_state:
@@ -28,7 +28,23 @@ if prompt := st.chat_input("Enter your message"):
     with st.chat_message("user"):
         st.write(prompt)
 
-    reply = respond(prompt, st.session_state.bot_state)
+    # Unexpected failures stay out of the user-facing chat.
+    try:
+        try:
+            api_key = st.secrets.get("GROQ_API_KEY", "")
+        except Exception:
+            api_key = ""
+
+        with st.spinner("Working…"):
+            reply = respond(
+                prompt, st.session_state.bot_state, api_key
+            )
+    except Exception:
+        logging.exception("Chat request failed")
+        reply = (
+            "Something went wrong. Please try again, "
+            "or type reset to start a new request."
+        )
 
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
