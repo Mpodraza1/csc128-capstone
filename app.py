@@ -9,7 +9,7 @@ st.caption(
     "This is an AI software assistant for exploring guitar tunings."
 )
 st.write(
-    "Commands: **analyze**, **transpose**, **ideas**, **reset**."
+    "Commands: **analyze**, **transpose**, **create**, **ideas**, **reset**."
 )
 
 if "messages" not in st.session_state:
